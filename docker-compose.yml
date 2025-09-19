@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend 
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db  # 確保在啟動 backend 服務前，db 服務已經啟動
+    env_file:
+      - .env # 引用 .env 檔案中的變數
+    restart: always
+
+  db:
+    image: mysql:8.0
+    container_name: teamtask-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: taskdb # 指定預設創建的資料庫名稱
+    ports:
+      - "3306:3306" # 映射資料庫埠號，方便本地端使用 GUI 工具連線
+    volumes:
+      - db_data:/var/lib/mysql # 將資料庫檔案持久化到主機上，避免容器重啟後資料遺失
+
+# 定義資料卷，用來持久化資料庫資料
+volumes:
+  db_data:
