@@ -6,11 +6,20 @@ import {
     type DropResult,
 } from "@hello-pangea/dnd";
 
-import { getTasks, addTask, updateTask, deleteTask } from "../services/api";
+import {
+    getPersonalTasks,
+    getTeamTasks,
+    addTask,
+    createTeamTask,
+    updateTask,
+    deleteTask
+} from "../services/api";
 import type { User } from "../types/type";
 import type { Task } from "../types/task";
+import type { Team } from "../types/team";
 import TaskModal from "../components/TaskModal";
 import TaskCard from "../components/TaskCard";
+import TeamSelector from "../components/TeamSelector";
 import { Link } from "react-router-dom";
 
 type DashboardProps = {
@@ -43,10 +52,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     const [modalTask, setModalTask] = useState<Task | null>(null);
     const [loading, setLoading] = useState(true);
 
+    // 團隊狀態
+    const [workMode, setWorkMode] = useState<'personal' | 'team'>('personal');
+    const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+
     // 取得任務
     const fetchTasks = async () => {
         try {
-            const fetchedTasks = await getTasks(user.id);
+            let fetchedTasks: Task[] = [];
+
+            if (workMode === 'personal') {
+                // 個人模式：只取得個人任務
+                fetchedTasks = await getPersonalTasks();
+            } else if (workMode === 'team' && selectedTeam) {
+                // 團隊模式：取得團隊任務
+                fetchedTasks = await getTeamTasks(selectedTeam.id);
+            }
+
             const taskMap = fetchedTasks.reduce((acc, task) => {
                 acc[task.id] = task;
                 return acc;
@@ -63,7 +85,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
     useEffect(() => {
         fetchTasks();
-    }, [user.id]);
+    }, [workMode, selectedTeam]);
 
     // 新增任務
     const handleAddTask = async (columnId: string) => {
@@ -75,9 +97,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         };
 
         try {
-            const createdTask = await addTask(user.id, newTask);
+            let createdTask: Task;
 
-            // 立即更新前端
+            if (workMode === 'personal') {
+                // 個人任務
+                createdTask = await addTask(user.id, newTask);
+            } else if (workMode === 'team' && selectedTeam) {
+                // 團隊任務
+                createdTask = await createTeamTask(selectedTeam.id, newTask);
+            } else {
+                return; // 無效狀態
+            }
+
             setTasks(prev => ({ ...prev, [createdTask.id]: createdTask }));
             setColumns(prev => {
                 const col = prev[columnId];
@@ -88,7 +119,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         }
     };
 
-    // 刪除任務 - 完全不重新獲取資料
+    // 刪除任務
     const handleDeleteTask = async (taskId: number) => {
         // 樂觀更新：立即從UI中移除
         setTasks(prev => {
@@ -109,13 +140,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             return newColumns;
         });
 
-        // 後台執行刪除，但不重新獲取資料
+        // 後台執行刪除
         try {
             await deleteTask(taskId);
         } catch (err) {
             console.error("Failed to delete task:", err);
             // 即使刪除失敗，也不重新獲取資料，保持當前狀態
-            // 可以顯示錯誤訊息給用戶
         }
     };
 
@@ -142,7 +172,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         }
     };
 
-    // 拖拉任務 - 確保狀態完全同步
+    // 拖拉任務
     const onDragEnd = async (result: DropResult) => {
         const { destination, source, draggableId } = result;
         if (!destination) return;
@@ -150,7 +180,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         const taskId = parseInt(draggableId);
         const newStatus = destination.droppableId as "todo" | "in-progress" | "done";
 
-        // 1. 先更新 columns 狀態
+        // 先更新 columns 狀態
         setColumns(prev => {
             const newColumns = { ...prev };
 
@@ -178,38 +208,59 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             return newColumns;
         });
 
-        // 2. 如果跨欄位移動，立即更新 tasks 中的狀態
+        // 如果跨欄位移動，立即更新 tasks 中的狀態
         if (source.droppableId !== destination.droppableId) {
             setTasks(prev => ({
                 ...prev,
                 [taskId]: { ...prev[taskId], status: newStatus }
             }));
 
-            // 3. 同步更新後端，使用 try-catch 但不回滾
+            // 同步更新後端
             try {
                 await updateTask(taskId, { status: newStatus });
             } catch (err) {
                 console.error("Failed to update task status:", err);
-                // 不回滾，保持前端狀態
             }
         }
     };
+
+    const getPageTitle = () => {
+        if (workMode === 'personal') {
+            return "個人任務";
+        } else if (selectedTeam) {
+            return `團隊任務 - ${selectedTeam.name}`;
+        } else {
+            return "選擇團隊";
+        }
+    };
+
+    const canAddTasks = workMode === 'personal' || (workMode === 'team' && selectedTeam);
 
     if (loading) return <div className="p-6 text-center text-gray-500">載入中...</div>;
 
     return (
         <div className="p-6 bg-gray-100 min-h-screen">
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold">📋 我的任務</h1>
+                <h1 className="text-2xl font-bold">📋 {getPageTitle()}</h1>
                 <div className="flex items-center gap-4">
-                    {/* 個人資料按鈕 */}
                     <Link
                         to="/profile"
                         className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
                     >
                         個人資料
                     </Link>
-                    {/* 登出按鈕 */}
+                    <Link
+                        to="/all-tasks"
+                        className="px-3 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600"
+                    >
+                        我的所有任務
+                    </Link>
+                    <Link
+                        to="/teams"
+                        className="px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600"
+                    >
+                        團隊管理
+                    </Link>
                     <span className="font-medium text-gray-700">👤 {user.username}</span>
                     <button
                         onClick={onLogout}
@@ -220,58 +271,73 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 </div>
             </div>
 
-            <DragDropContext onDragEnd={onDragEnd}>
-                <div className="grid grid-cols-3 gap-4">
-                    {Object.values(columns).map(col => (
-                        <Droppable droppableId={col.id} key={col.id}>
-                            {(provided) => (
-                                <div
-                                    ref={provided.innerRef}
-                                    {...provided.droppableProps}
-                                    className="bg-white rounded-lg shadow p-4 min-h-[300px]"
-                                >
-                                    <h2 className="text-lg font-semibold mb-3">{col.title}</h2>
+            {/* 團隊選擇器 */}
+            <TeamSelector
+                selectedMode={workMode}
+                selectedTeam={selectedTeam}
+                onModeChange={setWorkMode}
+                onTeamChange={setSelectedTeam}
+            />
 
-                                    {col.taskIds.length === 0 ? (
-                                        <div className="text-gray-500 text-sm italic">沒有任務</div>
-                                    ) : (
-                                        col.taskIds.map((taskId, index) => {
-                                            const task = tasks[taskId];
-                                            if (!task) return null;
-                                            return (
-                                                <Draggable key={task.id} draggableId={String(task.id)} index={index}>
-                                                    {(provided) => (
-                                                        <div
-                                                            ref={provided.innerRef}
-                                                            {...provided.draggableProps}
-                                                            {...provided.dragHandleProps}
-                                                        >
-                                                            <TaskCard
-                                                                task={task}
-                                                                onDelete={() => handleDeleteTask(task.id)}
-                                                                onOpen={() => setModalTask(task)}
-                                                            />
-                                                        </div>
-                                                    )}
-                                                </Draggable>
-                                            );
-                                        })
-                                    )}
-
-                                    {provided.placeholder}
-
-                                    <button
-                                        onClick={() => handleAddTask(col.id)}
-                                        className="mt-2 w-full text-blue-500 hover:text-blue-700 font-medium"
+            {/* 任務看板 */}
+            {canAddTasks ? (
+                <DragDropContext onDragEnd={onDragEnd}>
+                    <div className="grid grid-cols-3 gap-4">
+                        {Object.values(columns).map(col => (
+                            <Droppable droppableId={col.id} key={col.id}>
+                                {(provided) => (
+                                    <div
+                                        ref={provided.innerRef}
+                                        {...provided.droppableProps}
+                                        className="bg-white rounded-lg shadow p-4 min-h-[300px]"
                                     >
-                                        ➕ 新增任務
-                                    </button>
-                                </div>
-                            )}
-                        </Droppable>
-                    ))}
+                                        <h2 className="text-lg font-semibold mb-3">{col.title}</h2>
+
+                                        {col.taskIds.length === 0 ? (
+                                            <div className="text-gray-500 text-sm italic">沒有任務</div>
+                                        ) : (
+                                            col.taskIds.map((taskId, index) => {
+                                                const task = tasks[taskId];
+                                                if (!task) return null;
+                                                return (
+                                                    <Draggable key={task.id} draggableId={String(task.id)} index={index}>
+                                                        {(provided) => (
+                                                            <div
+                                                                ref={provided.innerRef}
+                                                                {...provided.draggableProps}
+                                                                {...provided.dragHandleProps}
+                                                            >
+                                                                <TaskCard
+                                                                    task={task}
+                                                                    onDelete={() => handleDeleteTask(task.id)}
+                                                                    onOpen={() => setModalTask(task)}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </Draggable>
+                                                );
+                                            })
+                                        )}
+
+                                        {provided.placeholder}
+
+                                        <button
+                                            onClick={() => handleAddTask(col.id)}
+                                            className="mt-2 w-full text-blue-500 hover:text-blue-700 font-medium"
+                                        >
+                                            ➕ 新增任務
+                                        </button>
+                                    </div>
+                                )}
+                            </Droppable>
+                        ))}
+                    </div>
+                </DragDropContext>
+            ) : (
+                <div className="text-center text-gray-500 mt-20">
+                    <p className="text-lg">請選擇一個團隊來查看和管理任務</p>
                 </div>
-            </DragDropContext>
+            )}
 
             <TaskModal
                 task={modalTask}

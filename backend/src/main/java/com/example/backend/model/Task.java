@@ -1,6 +1,7 @@
 package com.example.backend.model;
 
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "tasks")
@@ -11,14 +12,23 @@ public class Task {
 
     private String title;
     private String description;
-
-    // 新增狀態和指派人欄位
     private String status;
-    private String assignee;
+    private String assignee; // 保留原有字串欄位作為顯示名稱
 
     @ManyToOne
     @JoinColumn(name = "user_id")
-    private User user;
+    private User user; // 任務建立者
+
+    @ManyToOne
+    @JoinColumn(name = "team_id")
+    private Team team; // 所屬團隊
+
+    @ManyToOne
+    @JoinColumn(name = "assigned_to")
+    private User assignedTo; // 實際分配的用戶
+
+    @Column(name = "due_date")
+    private LocalDateTime dueDate;
 
     // getter & setter
     public Long getId() {
@@ -67,5 +77,29 @@ public class Task {
 
     public void setUser(User user2) {
         this.user = user2;
+    }
+
+    public Team getTeam() {
+        return team;
+    }
+
+    public void setTeam(Team team) {
+        this.team = team;
+    }
+
+    public User getAssignedTo() {
+        return assignedTo;
+    }
+
+    public void setAssignedTo(User assignedTo) {
+        this.assignedTo = assignedTo;
+    }
+
+    public LocalDateTime getDueDate() {
+        return dueDate;
+    }
+
+    public void setDueDate(LocalDateTime dueDate) {
+        this.dueDate = dueDate;
     }
 }

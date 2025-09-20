@@ -5,6 +5,8 @@ import RegisterPage from "../pages/RegisterPage";
 import Dashboard from "../pages/Dashboard";
 import ProfilePage from "../pages/ProfilePage";
 import type { User } from "../types/type";
+import TeamManagement from "../pages/TeamManagement";
+import AllTasks from "../pages/AllTasks";
 
 export default function AppRoutes() {
     const [user, setUser] = useState<User | null>(null);
@@ -53,6 +55,26 @@ export default function AppRoutes() {
                             <ProfilePage />
                         ) : (
                             // 當使用者未登入時，導向登入頁面
+                            <Navigate to="/" />
+                        )
+                    }
+                />
+                <Route
+                    path="/teams"
+                    element={
+                        user ? (
+                            <TeamManagement />
+                        ) : (
+                            <Navigate to="/" />
+                        )
+                    }
+                />
+                <Route
+                    path="/all-tasks"
+                    element={
+                        user ? (
+                            <AllTasks />
+                        ) : (
                             <Navigate to="/" />
                         )
                     }
