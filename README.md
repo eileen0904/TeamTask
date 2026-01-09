@@ -57,14 +57,19 @@ cd TeamTask
 
 2. **Set Environment Variables**
 ```bash
-# Create .env file
+# Create a .env file in the project root
 echo "MYSQL_ROOT_PASSWORD=your_secure_password" > .env
 ```
 
 3. **Start Service**
 ```bash
 # Start backend and database
-docker-compose up -d
+cd backend
+# Run the Maven build command
+# Verify that "backend-0.0.1-SNAPSHOT.jar" has been generated in the backend/target/ directory.
+./mvnw clean package -DskipTests
+# Run the following command in the project root to start the MySQL database and the backend API: 
+docker-compose up --build
 
 # Start frontend
 cd frontend
@@ -86,8 +91,70 @@ CREATE DATABASE IF NOT EXISTS taskdb;
 USE taskdb;
 ```
 
-## API 
+## Demo
+登入畫面
+![Login](./images/Login.png)
 
+註冊畫面
+![Register](./images/Register.png)
+
+建立任務
+![CreateTask](./images/CreateTask.png)
+
+可以在三個板塊中拖曳任務
+![DragTask](./images/DragTask.png)
+
+當任務被拖曳到另一個板塊時，任務的狀態會改變 (代辦->進行中)
+![InProgress](./images/InProgress.png)
+
+建立團隊
+![CreateTeam](./images/CreateTeam.png)
+
+建立的團隊和所屬的團隊可以在團隊管理頁面上看到
+![TeamManager](./images/TeamManager.png)
+
+選擇要在哪一個團隊建立團隊任務
+![ChooseTeam](./images/ChooseTeam.png)
+
+建立團隊任務
+![CreateTeamTask](./images/CreateTeamTask.png)
+
+在我的任務頁面可以看到自己所有的任務
+![MyAllTasks](./images/MyAllTasks.png)
+
+團隊管理員可以刪除團隊
+![DeleteTeam](./images/DeleteTeam.png)
+
+團隊管理員可以邀請有註冊的成員
+![InviteSuccess](./images/InviteSuccess.png)
+
+如果邀請沒有註冊的人會邀請失敗
+![InviteFail](./images/InviteFail.png)
+
+在團隊管理頁面可以看到團隊成員
+![TeamMember](./images/TeamMember.png)
+
+當其中一位成員建立團隊任務，其他成員可以在該團隊任務頁面中看到已被建立的任務及任務創建人
+![test1TeamTask](./images/test1TeamTask.png)
+
+## User Guide
+### 個人任務管理
+1. 註冊並登入系統
+2. 在主面板使用拖拽方式管理任務
+3. 點擊任務卡片編輯詳情和設定截止時間
+4. 使用「我的所有任務」檢視全部任務狀況
+
+### 團隊協作
+1. 前往「團隊管理」頁面建立團隊
+2. 邀請其他用戶加入團隊
+3. 在主面板切換到團隊模式
+4. 協作管理團隊任務
+
+### 權限說明
+- **團隊擁有者**：完全控制權，可刪除團隊、邀請/移除成員，管理任務
+- **成員**：可檢視和編輯團隊任務
+
+## API 
 ### Auth API
 ```
 POST /api/auth/register    # 用戶註冊
@@ -116,23 +183,6 @@ GET    /api/teams/{id}/members # 獲取團隊成員
 POST   /api/teams/{id}/members # 邀請團隊成員
 DELETE /api/teams/{id}/members/{memberId} # 移除團隊成員
 ```
-
-## User Guide
-### 個人任務管理
-1. 註冊並登入系統
-2. 在主面板使用拖拽方式管理任務
-3. 點擊任務卡片編輯詳情和設定截止時間
-4. 使用「我的所有任務」檢視全部任務狀況
-
-### 團隊協作
-1. 前往「團隊管理」頁面建立團隊
-2. 邀請其他用戶加入團隊
-3. 在主面板切換到團隊模式
-4. 協作管理團隊任務
-
-### 權限說明
-- **團隊擁有者**：完全控制權，可刪除團隊、邀請/移除成員，管理任務
-- **成員**：可檢視和編輯團隊任務
 
 ## Develop
 ### Local Develop Environment
